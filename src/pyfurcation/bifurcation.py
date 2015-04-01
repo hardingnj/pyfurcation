@@ -1,12 +1,29 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+#
+# def memoize(f):
+#     memo = {}
+#
+#     def helper(*args):
+#         #a, focal_markers,  = args
+#         hashed = 2
+#         if hashed not in memo:
+#             memo[hashed] = f(*args)
+#         return memo[hashed]
+#     return helper
+#
+#
+# @memoize
 
 
-def bifurcation_analysis(a, focal_markers=None, core_haplotype=0,
+def bifurcation_analysis(a, focal_markers=None, core_haplotype=np.zeros(1),
                          n_markers=None, min_hap_count=10,
                          max_marker_missingness=0.0, side='right'):
     """
-    Convenience function called by haplotype_bifurcation()
+    Convenience function called by haplotype_bifurcation().
+    Does most of the work!
     
     Determine the tree structure of a set of haplotypes around a focal core
     haplotype, i.e. do the analysis required to create input needed for
@@ -253,66 +270,75 @@ def bifurcation_analysis(a, focal_markers=None, core_haplotype=0,
         node_haplotypes = None
         branching_structure = None
     
-    return(
-        dict(
-             node_haplotypes=node_haplotypes,
-             branching_structure=branching_structure
-        )
-    )
+    return dict(node_haplotypes=node_haplotypes,
+                branching_structure=branching_structure)
 
 
-def bifurcation_coords(node_haplotypes, branching_structure, focal_markers, position, n_markers=None, side="right"):
+def bifurcation_coords(node_haplotypes, branching_structure, focal_markers,
+                       position, n_markers=None, side="right"):
     
     """
     Convenience function called by haplotype_bifurcation()
     
-    Determine the coordinates of the haplotype tree to be plotted, i.e. do the work required to create the input for
-    haplotype_bifurcation_branch().
+    Determine the coordinates of the haplotype tree to be plotted, i.e. do the
+    work required to create the input for draw_bifurcation_branch().
     
-    This function is loosely based on the function bifurcation.diagram from R package rehh (Mathieu Gautier and Renaud 
-    Vitalis) http://cran.r-project.org/web/packages/rehh/index.html
+    This function is loosely based on the function bifurcation.diagram from R
+    package rehh (Mathieu Gautier and Renaud Vitalis)
+    http://cran.r-project.org/web/packages/rehh/index.html
     
     Parameters
     ---------
 
     node_haplotypes: structured array
     
-        Holds all the possible haplotypes in the tree. Each record is a distinct haplotype at a distinct marker 
-        (i.e. each record is a branch in the tree).
+        Holds all the possible haplotypes in the tree. Each record is a distinct
+         haplotype at a distinct marker (i.e. each record is a branch in the
+         tree).
         
-        node_haplotypes is initialised with the element for the core haplotype, and the loops of the function add new 
-        elements, starting with the branches from the core haplotype, and ending at the haplotypes of the leaves of the 
-        tree (i.e. the markers furthest from the focal markers)
+        node_haplotypes is initialised with the element for the core haplotype,
+        and the loops of the function add new elements, starting with the
+        branches from the core haplotype, and ending at the haplotypes of the
+        leaves of the tree (i.e. the markers furthest from the focal markers)
         
         Each record has 3 items:
             haplotype_string: str
-                Haplotype as a string which is the concatenation of all the genotypes from the core haplotype to the 
-                given node. 
+                Haplotype as a string which is the concatenation of all the
+                genotypes from the core haplotype to the given node.
             marker_relative_index: int
-                Position of this marker with respect to the (nearest) focal marker, where 0 is the (nearest) focal 
-                marker, 1 is the nearest marker to this, 2 is the second nearest marker and so on.
+                Position of this marker with respect to the (nearest) focal
+                marker, where 0 is the (nearest) focal marker, 1 is the nearest
+                marker to this, 2 is the second nearest marker and so on.
             n_haplotypes: int
                 Number of samples with this haplotype at this marker
     
     branching_structure: structured array
     
-        Haplotype tree structure to one side of the focal marker. Each element is a distinct node in the tree.
+        Haplotype tree structure to one side of the focal marker. Each element
+        is a distinct node in the tree.
         
-        branching_structure is initialised with no elements, and the loops of the function add new elements, starting 
-        with the core haplotype, and ending at the leaves of the tree (i.e. marker furthest from the core haplotype).
+        branching_structure is initialised with no elements, and the loops of
+        the function add new elements, starting with the core haplotype, and
+        ending at the leaves of the tree (i.e. marker furthest from the core
+        haplotype).
         
         Each records has 2 items:
             n_branches: int
-                Number of branches leading away from this node. Must be between 0 or 4, where 0 means this is a leaf 
-                node (this can only happen at furthest marker from core haplotype), 1 means there is no split, 2 means 
-                there is a biallelic split, 3 means there is a triallelic split, etc.
+                Number of branches leading away from this node. Must be between
+                0 or 4, where 0 means this is a leaf node (this can only happen
+                at furthest marker from core haplotype), 1 means there is no
+                split, 2 means there is a biallelic split, 3 means there is a
+                triallelic split, etc.
             node_indices: array of 4 ints
-                Indices of the nodes connected to the current node. Each index refers to a different node in branching 
-                stucture. First n_branches elements should be non-zero, and remaining should be 0.
+                Indices of the nodes connected to the current node. Each index
+                refers to a different node in branching stucture. First
+                n_branches elements should be non-zero, and remaining should
+                be 0.
     
     focal_markers: int/list/array
-        The marker(s) which is (are) to be used as the focus. This can be an integer, list of integers or numpy array of
-        integers. Each integer must be >= 0 and < np.shape(G)[0]
+        The marker(s) which is (are) to be used as the focus. This can be an
+        integer, list of integers or numpy array of integers. Each integer must
+        be >= 0 and < np.shape(G)[0]
     
     position: array
         1-d array of genomic coordinates of the markers
@@ -321,24 +347,30 @@ def bifurcation_coords(node_haplotypes, branching_structure, focal_markers, posi
         The number of markers to analyse.
         
     side: string
-        Which side of the focal marker to analyse. Valid values are 'left' or 'right'.
+        Which side of the focal marker to analyse.
+        Valid values are 'left' or 'right'.
     
 
     Return
     ---------
 
-    Returns a 2-d array containing the X (column 0) and Y(column 1) coordinates of each node in the tree.
+    Returns a 2-d array containing the X (column 0) and Y(column 1) coordinates
+    of each node in the tree.
     
     """
     
     coords = np.zeros((np.shape(node_haplotypes)[0], 2))
     for marker_relative_index in range(n_markers, -1, -1):
         # This identifies which rows are required
-        node_indices = np.where(node_haplotypes['marker_relative_index'] == marker_relative_index)[0]
+        node_indices = np.where(
+            node_haplotypes['marker_relative_index']
+            == marker_relative_index)[0]
         if side == 'right':
-            coords[node_indices, 0] = position[np.max(focal_markers) + marker_relative_index]
+            coords[node_indices, 0] = \
+                position[np.max(focal_markers) + marker_relative_index]
         else:
-            coords[node_indices, 0] = position[np.min(focal_markers) - marker_relative_index]
+            coords[node_indices, 0] = \
+                position[np.min(focal_markers) - marker_relative_index]
         if marker_relative_index == n_markers:
             coords[node_indices, 1] = (np.arange(len(node_indices))+1)/2.0
         else:
@@ -346,33 +378,34 @@ def bifurcation_coords(node_haplotypes, branching_structure, focal_markers, posi
             # clean up the following to allow arbitrary number of alleles
             for node_index in node_indices:
                 if branching_structure[node_index]['n_branches'] == 1:
-                    coords[node_index, 1] = coords[branching_structure[node_index]['node_indices'][0], 1]
+                    coords[node_index, 1] = \
+                        coords[branching_structure[node_index]['node_indices'][0], 1]
                 if branching_structure[node_index]['n_branches'] == 2:
-                    coords[node_index, 1] = np.mean(
-                                           [coords[branching_structure[node_index]['node_indices'][0], 1],
-                                            coords[branching_structure[node_index]['node_indices'][1], 1]]
-                                           )
+                    coords[node_index, 1] = \
+                        np.mean([coords[branching_structure[node_index]['node_indices'][0], 1],
+                                 coords[branching_structure[node_index]['node_indices'][1], 1]])
                 if branching_structure[node_index]['n_branches'] == 3:
-                    coords[node_index, 1] = np.mean(
-                                           [coords[branching_structure[node_index]['node_indices'][0], 1],
-                                            coords[branching_structure[node_index]['node_indices'][1], 1],
-                                            coords[branching_structure[node_index]['node_indices'][2], 1]]
-                                           )
+                    coords[node_index, 1] = \
+                        np.mean([coords[branching_structure[node_index]['node_indices'][0], 1],
+                                 coords[branching_structure[node_index]['node_indices'][1], 1],
+                                 coords[branching_structure[node_index]['node_indices'][2], 1]])
                 if branching_structure[node_index]['n_branches'] == 4:
-                    coords[node_index, 1] = np.mean(
-                                           [coords[branching_structure[node_index]['node_indices'][0], 1],
-                                            coords[branching_structure[node_index]['node_indices'][1], 1],
-                                            coords[branching_structure[node_index]['node_indices'][2], 1],
-                                            coords[branching_structure[node_index]['node_indices'][3], 1]]
-                                           )
+                    coords[node_index, 1] = \
+                        np.mean([coords[branching_structure[node_index]['node_indices'][0], 1],
+                                 coords[branching_structure[node_index]['node_indices'][1], 1],
+                                 coords[branching_structure[node_index]['node_indices'][2], 1],
+                                 coords[branching_structure[node_index]['node_indices'][3], 1]])
                 if side == 'right':
-                    coords[node_index, 0] = position[np.max(focal_markers) + marker_relative_index]
+                    coords[node_index, 0] = \
+                        position[np.max(focal_markers) + marker_relative_index]
                 if side == 'left':
-                    coords[node_index, 0] = position[np.min(focal_markers) - marker_relative_index]
+                    coords[node_index, 0] = \
+                        position[np.min(focal_markers) - marker_relative_index]
     return coords
 
 
-def haplotype_bifurcation_branch(analysis_results, bf_coords, n_markers, refsize, ax, **kwargs):
+def draw_bifurcation_branch(analysis_results, bf_coords, n_markers, refsize, ax,
+                            **kwargs):
 
     """
     Convenience function called by haplotype_bifurcation()
@@ -442,44 +475,57 @@ def haplotype_bifurcation_branch(analysis_results, bf_coords, n_markers, refsize
     
     """
 
-    lwd_adjust = analysis_results['node_haplotypes']['n_haplotypes'] * refsize
-        
+    baseline_lwd = analysis_results['node_haplotypes']['n_haplotypes'] * refsize
+    kwargs['solid_capstyle'] = kwargs.get('solid_capstyle', 'round')
+
     for marker_relative_index in range(n_markers - 1, -1, -1):
         # This identifies which rows are required
-        node_indices = np.where(analysis_results['node_haplotypes']['marker_relative_index'] == marker_relative_index)[0]
+        node_indices = np.where(
+            analysis_results['node_haplotypes']['marker_relative_index']
+            == marker_relative_index)[0]
         for node_index in node_indices:
             x0 = bf_coords[node_index, 0]
             y0 = bf_coords[node_index, 1]
-            for connected_node_index in range(analysis_results['branching_structure'][node_index]['n_branches']):
-                tmp_lwd = lwd_adjust[analysis_results['branching_structure'][node_index]['node_indices'][connected_node_index]]
-                x1 = bf_coords[analysis_results['branching_structure'][node_index]['node_indices'][connected_node_index], 0]
-                y1 = bf_coords[analysis_results['branching_structure'][node_index]['node_indices'][connected_node_index], 1]
-                l = plt.Line2D([x0, x1], [y0, y1], linewidth=tmp_lwd, solid_capstyle='round', **kwargs)
+            n_branches = analysis_results['branching_structure'][node_index][
+                'n_branches']
+            for connected_node_index in range(n_branches):
+                connected_node = analysis_results['branching_structure'][
+                    node_index]['node_indices'][connected_node_index]
+                tmp_lwd = baseline_lwd[connected_node]
+                x1 = bf_coords[connected_node, 0]
+                y1 = bf_coords[connected_node, 1]
+                l = plt.Line2D([x0, x1], [y0, y1],
+                               linewidth=tmp_lwd,
+                               **kwargs)
                 ax.add_line(l)
 
 
-def haplotype_bifurcation(a, position=None, focal_markers=None, core_haplotype=0, n_markers_l=None, n_markers_r=None,
-                          min_hap_count=10, max_marker_missingness=0.0, refsize=0.1, xlim=None, ylim=None, ax=None,
-                          **kwargs):
+def haplotype_bifurcation(a, position=None, focal_markers=None,
+                          core_haplotype=0, n_markers_l=None, n_markers_r=None,
+                          min_hap_count=10, max_marker_missingness=0.0,
+                          refsize=0.1, xlim=None, ylim=None, ax=None, **kwargs):
     """
     Haplotype bifurcation plot as introduced by Sabeti et al.
     (http://www.nature.com/nature/journal/v419/n6909/abs/nature01140.html)
     
-    This function is typically used to show extended haplotypes around a putatively causal marker. In many cases there
-    might be a core haplotype consisting of a derived allele at a given SNP (focal marker) which has extended haplotypes
-    due to recent positive selection, whereas the haplotypes for the ancestral allele at this same marker will have
-    much shorter haplotypes.
+    This function is typically used to show extended haplotypes around a
+    putatively causal marker. In many cases there might be a core haplotype
+    consisting of a derived allele at a given SNP (focal marker) which has
+    extended haplotypes due to recent positive selection, whereas the haplotypes
+    for the ancestral allele at this same marker will have much shorter
+    haplotypes.
     
-    This function is loosely based on the function bifurcation.diagram from R package rehh (Mathieu Gautier and Renaud
-    Vitalis)
+    This function is loosely based on the function bifurcation.diagram from R
+    package rehh (Mathieu Gautier and Renaud Vitalis)
     http://cran.r-project.org/web/packages/rehh/index.html
 
     Parameters
     ---------
 
-    G: array
-        2-dimensional array of haploid genotpyes coded as integers (-1 = missing, 0 = ancestral (or ref), 1 = derived
-        (or alt)), of shape (#variants, #samples).
+    a: array
+        2-dimensional array of haploid genotpyes coded as integers
+        (-1 = missing, 0 = ancestral (or ref), 1 = derived (or alt)), of shape
+        (#variants, #samples).
         
         Note that any sample that has any missing genotypes will be removed
     
@@ -487,11 +533,13 @@ def haplotype_bifurcation(a, position=None, focal_markers=None, core_haplotype=0
         1-d array of genomic coordinates of the markers
     
     focal_markers: int/list/array
-        The marker(s) which is (are) to be used as the focus. This can be an integer, list of integers or numpy array of
-        integers. Each integer must be >= 0 and < np.shape(G)[0]
+        The marker(s) which is (are) to be used as the focus. This can be an
+        integer, list of integers or numpy array of integers. Each integer
+        must be >= 0 and < np.shape(G)[0]
     
     core_haplotype: int/list/array
-        The genotype(s) of interest at the focal marker(s). These are as specified in the G array.
+        The genotype(s) of interest at the focal marker(s). These are as
+        specified in the a array.
         
     n_markers_l: int
         The number of markers to analyse to the left of the focal marker(s).
@@ -500,12 +548,15 @@ def haplotype_bifurcation(a, position=None, focal_markers=None, core_haplotype=0
         The number of markers to analyse to the right of the focal marker(s).
     
     min_hap_count: int
-        The minimum number of haplotypes to attempt to plot. Mainly used for sanity checking.
+        The minimum number of haplotypes to attempt to plot. Mainly used for
+        sanity checking.
         
     max_marker_missingness: float
-        The maximum amount of missingness to allow for a marker. The default of 0.0 will only use markers that have no
-        missing data (i.e. genotype == -1) for any samples. Setting to 1.0 will attempt to use all markers (though
-        beware that samples with any missing data are subsequently removed). Should be a float between 0.0 and 1.0.
+        The maximum amount of missingness to allow for a marker. The default of
+         0.0 will only use markers that have no missing data (i.e. genotype ==
+         -1) for any samples. Setting to 1.0 will attempt to use all markers
+         (though beware that samples with any missing data are subsequently
+         removed). Should be a float between 0.0 and 1.0.
         
     refsize: float
         The line width to use for a single haplotype.
@@ -524,86 +575,85 @@ def haplotype_bifurcation(a, position=None, focal_markers=None, core_haplotype=0
     """
     
     # sanity check inputs
-    assert isinstance(a, np.ndarray), "G is not a numpy array"
-    
-    assert len(np.shape(a)) == 2, "G is not a 2-dimensional array"
+    assert isinstance(a, np.ndarray), "a is not a numpy array"
+    assert a.ndim == 2, "a is not a 2-dimensional array"
     
     # Remove markers with high missingess
-    low_missingness_markers = np.apply_along_axis(lambda x: np.sum(x==-1), 1, a) <= max_marker_missingness
-    a = a[low_missingness_markers, :]
-    
+    missingness = np.mean(a == -1, axis=1)
+    fails_missingness = missingness > max_marker_missingness
+    a = np.compress(~fails_missingness, a, axis=0)
+
     # if no positions supplied, plot markers equidistantly
     if position is None:
         position = np.arange(np.shape(a)[0])
     else:
-        position = position[low_missingness_markers]
-        
+        position = np.compress(~fails_missingness, position)
+
     # if no focal marker supplied, take the middle marker
     if focal_markers is None:
-        focal_markers = np.shape(a)[0] / 2
+        focal_markers = np.shape(a)[0] // 2
         
-    if isinstance(focal_markers, int):
-        focal_markers = np.array([focal_markers])
-    if isinstance(focal_markers, list):
-        focal_markers = np.array(focal_markers)
-    assert isinstance(focal_markers, np.ndarray), "focal_markers must be an int, list, or numpy array"
+    focal_markers = np.array(focal_markers)
 
-    low_missingness_indices = np.vectorize(lambda x:
-        np.sum(low_missingness_markers[np.arange(x+1)]) - 1 if
-            low_missingness_markers[x]==True else -1)
-    focal_markers_new_indices = low_missingness_indices(focal_markers)
-    low_missingness_focal_markers = np.where(focal_markers_new_indices == -1)[0]
-    assert len(low_missingness_focal_markers) == 0, \
-        "focal_markers %s have low missingness, perhaps rerun with higher max_marker_missingness?" % ( \
-            focal_markers[low_missingness_focal_markers])
-    focal_markers = focal_markers_new_indices
-    
-    if isinstance(core_haplotype, int):
-        core_haplotype = np.array([core_haplotype])
-    if isinstance(core_haplotype, list):
-        core_haplotype = np.array(core_haplotype)
-    assert isinstance(core_haplotype, np.ndarray), "core_haplotype must be an int, list, or numpy array"
-    assert len(core_haplotype) in [1, len(focal_markers)], "core_haplotype has different length than focal_markers"
+    # check that no focal markers have high missingness:
+    missing_indices = np.where(fails_missingness)[0]
+    missing_focal = np.in1d(focal_markers, missing_indices)
+    assert not np.any(missing_focal), \
+        "focal_markers %s missingness > theshold." % \
+        np.compress(missing_focal, focal_markers)
+
+    # translate focal markers to new positions if missingness found
+    focal_markers = focal_markers - np.take(fails_missingness.cumsum(),
+                                            focal_markers)
+
+    core_haplotype = np.array([core_haplotype])
+    assert core_haplotype.size == focal_markers.size, \
+        "core_haplotype has a different length than focal_markers"
     
     if n_markers_l is None:
         n_markers_l = np.min(focal_markers)
+    assert n_markers_l <= np.min(focal_markers), \
+        "Too many markers on the left"
+    assert n_markers_l >= 0, "n_markers_l must be >= 0 (%s)" % n_markers_l
+
     if n_markers_r is None:
         n_markers_r = np.shape(a)[0] - np.max(focal_markers) - 1
-    assert n_markers_l >= 0, "n_markers_l must be >= 0"
-    assert n_markers_r >= 0, "n_markers_r must be >= 0"
-    
+    assert n_markers_r <= np.shape(a)[0] - np.max(focal_markers) + 1, \
+        "Too many markers on the right"
+    assert n_markers_r >= 0, "n_markers_r must be >= 0 (%s)" % n_markers_r
+
     assert min_hap_count >= 1, "min_hap_count must be >= 1"
-        
-    assert n_markers_l <= np.min(focal_markers), "Too many markers on the left"
-    assert n_markers_r <= np.shape(a)[0] - np.max(focal_markers) + 1, "Too many markers on the right"
-    
+
     # perform analyses
-    analysis_results_r = bifurcation_analysis(a, focal_markers, core_haplotype, n_markers_r, min_hap_count, side='right')
-    analysis_results_l = bifurcation_analysis(a, focal_markers, core_haplotype, n_markers_l, min_hap_count, side='left')
-    bifurcation_coords_r = bifurcation_coords(
-                                              analysis_results_r['node_haplotypes'],
-                                              analysis_results_r['branching_structure'],
-                                              focal_markers,
-                                              position,
-                                              n_markers_r,
-                                              'right'
-                                              )
-    bifurcation_coords_l = bifurcation_coords(
-                                              analysis_results_l['node_haplotypes'],
-                                              analysis_results_l['branching_structure'],
-                                              focal_markers,
-                                              position,
-                                              n_markers_l,
-                                              'left'
-                                              )
-    
+    analysis_results_r = bifurcation_analysis(a, focal_markers, core_haplotype,
+                                              n_markers_r, min_hap_count,
+                                              side='right')
+    analysis_results_l = bifurcation_analysis(a, focal_markers, core_haplotype,
+                                              n_markers_l, min_hap_count,
+                                              side='left')
+
+    bif_coord_r = bifurcation_coords(analysis_results_r['node_haplotypes'],
+                                     analysis_results_r['branching_structure'],
+                                     focal_markers,
+                                     position,
+                                     n_markers_r,
+                                     'right')
+
+    bif_coord_l = bifurcation_coords(analysis_results_l['node_haplotypes'],
+                                     analysis_results_l['branching_structure'],
+                                     focal_markers,
+                                     position,
+                                     n_markers_l,
+                                     'left')
+
     # recalibrate coordinates of left branch so focal marker is at same position
     if n_markers_l > 0 and n_markers_r > 0:
-        bifurcation_coords_l[:, 1] = bifurcation_coords_l[:, 1] + bifurcation_coords_r[0, 1] - bifurcation_coords_l[0, 1]
+        bif_coord_l[:, 1] = bif_coord_l[:, 1] + bif_coord_r[0, 1] \
+            - bif_coord_l[0, 1]
  
     # set up axes
     if ax is None:
-        fig = plt.figure(figsize=(14, 4))
+        fig = plt.figure(figsize=(16, 8))
         ax = fig.add_subplot(111)
 
     if xlim is None:
@@ -611,21 +661,33 @@ def haplotype_bifurcation(a, position=None, focal_markers=None, core_haplotype=0
     start, stop = xlim
     ax.set_xlim(start, stop)
     if ylim is None:
-        min_y = min(np.min(bifurcation_coords_l[:, 1]), np.min(bifurcation_coords_r[:, 1]))
-        max_y = max(np.max(bifurcation_coords_l[:, 1]), np.max(bifurcation_coords_r[:, 1]))
+        min_y = min(np.min(bif_coord_l[:, 1]), np.min(bif_coord_r[:, 1]))
+        max_y = max(np.max(bif_coord_l[:, 1]), np.max(bif_coord_r[:, 1]))
     else:
         min_y, max_y = ylim
-    ax.set_ylim(
-        min_y - (max_y - min_y) * 0.05,
-        max_y + (max_y - min_y) * 0.05
-    )
+    ax.set_ylim(min_y - (max_y - min_y) * 0.05,
+                max_y + (max_y - min_y) * 0.05)
+    ax.set_yticklabels([])
 
     # create the plot
     if n_markers_r > 0:
-        haplotype_bifurcation_branch(analysis_results_r, bifurcation_coords_r, n_markers_r, refsize, ax, **kwargs)
+        draw_bifurcation_branch(analysis_results_r, bif_coord_r,
+                                n_markers_r, refsize, ax, **kwargs)
     
     if n_markers_l > 0:
-        haplotype_bifurcation_branch(analysis_results_l, bifurcation_coords_l, n_markers_l, refsize, ax, **kwargs)
+        draw_bifurcation_branch(analysis_results_l, bif_coord_l,
+                                n_markers_l, refsize, ax, **kwargs)
     
     # return the plot
     return ax
+
+#
+# def alternative_plot(node_haplotypes, branching_structure, focal_markers,
+#                      position, n_markers=None, side="right"):
+#
+#     # this function uses the information in node haplotypes and produces a
+#     # branching graph.
+#
+#     # basically:
+#     # work backwards:
+
